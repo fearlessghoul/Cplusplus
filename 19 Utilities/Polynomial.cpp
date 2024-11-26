@@ -1,156 +1,186 @@
 #include <iostream>
-#include <map>
+#include <initializer_list>
 #include <cmath>
-#include <stdexcept>
+#include <algorithm>
 #include <sstream>
-#include <iomanip>
 
+template <typename T>
 class Polynomial {
 private:
-    // Using a map to store the coefficients, where the key is the exponent and the value is the coefficient.
-    std::map<int, double> terms; // Example: 3x^2 + 4x + 5 will be stored as {{2, 3}, {1, 4}, {0, 5}}
+    T* terms;   // Pointer to array of coefficients
+    int degree_; // Degree of the polynomial
 
 public:
-    // Constructors
-    Polynomial() = default;
+    Polynomial()=default;
+    // Constructor using initializer list
+    Polynomial(std::initializer_list<T> coeffs) {
+        degree_ = coeffs.size() - 1;
+        terms = new T[degree_ + 1]{0};  // Initialize with zeros
 
-    // Construct polynomial from a vector of coefficients (e.g., {5, 4, 3} -> 3x^2 + 4x + 5)
-    Polynomial(const std::initializer_list<double>& coeffs) {
-        int exp = 0;
-        for (double coeff : coeffs) {
-            if (coeff != 0) {
-                terms[exp] = coeff;
-            }
-            ++exp;
+        int i = degree_;
+        for (T coeff : coeffs) {
+            terms[i] = coeff;
+            i--;
         }
+    }
+
+    // Destructor to clean up allocated memory
+    ~Polynomial() {
+        delete[] terms;
     }
 
     // Copy constructor
-    Polynomial(const Polynomial& other) : terms(other.terms) {}
+    Polynomial(const Polynomial& other) : degree_(other.degree_) {
+        terms = new T[degree_ + 1];
+        std::copy(other.terms, other.terms + degree_ + 1, terms);
+    }
 
     // Move constructor
-    Polynomial(Polynomial&& other) noexcept : terms(std::move(other.terms)) {}
+    Polynomial(Polynomial&& other) noexcept : terms(other.terms), degree_(other.degree_) {
+        other.terms = nullptr;
+        other.degree_ = -1;
+    }
 
-    // Copy assignment
+    // Copy assignment operator
     Polynomial& operator=(const Polynomial& other) {
         if (this != &other) {
-            terms = other.terms;
+            delete[] terms;  // Clean up old memory
+            degree_ = other.degree_;
+            terms = new T[degree_ + 1];
+            std::copy(other.terms, other.terms + degree_ + 1, terms);
         }
         return *this;
     }
 
-    // Move assignment
+    // Move assignment operator
     Polynomial& operator=(Polynomial&& other) noexcept {
         if (this != &other) {
-            terms = std::move(other.terms);
+            delete[] terms;  // Clean up old memory
+            terms = other.terms;
+            degree_ = other.degree_;
+            other.terms = nullptr;
+            other.degree_ = -1;
         }
         return *this;
     }
 
-    // Get degree of the polynomial (highest exponent)
+    // Degree of the polynomial (highest exponent)
     int degree() const {
-        if (terms.empty()) return -1; // Degree of the zero polynomial is conventionally -1
-        return terms.rbegin()->first; // Highest exponent
+        return degree_;
     }
 
     // Access coefficient of a specific term (const)
-    double operator[](int exp) const {
-        auto it = terms.find(exp);
-        return (it != terms.end()) ? it->second : 0.0;
+    T operator[](int exp) const {
+        if (exp <= degree_ && exp >= 0) {
+            return terms[exp];
+        }
+        return T(0); // Return default value of T
     }
 
     // Access coefficient of a specific term (non-const)
-    double& operator[](int exp) {
+    T& operator[](int exp) {
+        if (exp <= degree_ && exp >= 0) {
+            return terms[exp];
+        }
+        // For simplicity, assume valid exponents are passed.
         return terms[exp];
     }
 
     // Evaluate the polynomial at a given value of x
-    double evaluate(double x) const {
-        double result = 0.0;
-        for (const auto& [exp, coeff] : terms) {
-            result += coeff * std::pow(x, exp);
+    T evaluate(T x) const {
+        T result = T(0);
+        for (int i = 0; i <= degree_; ++i) {
+            result += terms[i] * std::pow(x, i);
         }
         return result;
     }
 
     // Derivative of the polynomial
     Polynomial derivative() const {
-        Polynomial result;
-        for (const auto& [exp, coeff] : terms) {
-            if (exp > 0) {
-                result.terms[exp - 1] = coeff * exp;
-            }
+        Polynomial<T> result;
+        result.degree_ = degree_ - 1;
+        result.terms = new T[degree_]{0};
+
+        for (int i = 1; i <= degree_; ++i) {
+            result.terms[i - 1] = terms[i] * i;
         }
         return result;
     }
 
-    // Indefinite integral of the polynomial (assumes constant of integration is 0)
+    // Indefinite integral of the polynomial (constant of integration assumed 0)
     Polynomial integral() const {
-        Polynomial result;
-        for (const auto& [exp, coeff] : terms) {
-            result.terms[exp + 1] = coeff / (exp + 1);
+        Polynomial<T> result;
+        result.degree_ = degree_ + 1;
+        result.terms = new T[degree_ + 2]{0};
+
+        for (int i = 0; i <= degree_; ++i) {
+            result.terms[i + 1] = terms[i] / (i + 1);
         }
         return result;
-    }
-
-    // Normalize the polynomial (remove zero terms)
-    void normalize() {
-        for (auto it = terms.begin(); it != terms.end();) {
-            if (std::abs(it->second) < 1e-9) {
-                it = terms.erase(it);
-            } else {
-                ++it;
-            }
-        }
     }
 
     // Overloaded Operators for Polynomial Arithmetic
 
     // Addition
     Polynomial operator+(const Polynomial& other) const {
-        Polynomial result(*this);
-        for (const auto& [exp, coeff] : other.terms) {
-            result[exp] += coeff;
+        int max_degree = std::max(degree_, other.degree_);
+        Polynomial<T> result;
+        result.degree_ = max_degree;
+        result.terms = new T[max_degree + 1]{0};
+
+        for (int i = 0; i <= max_degree; ++i) {
+            result.terms[i] = (*this)[i] + other[i];
         }
-        result.normalize();
         return result;
     }
 
     // Subtraction
     Polynomial operator-(const Polynomial& other) const {
-        Polynomial result(*this);
-        for (const auto& [exp, coeff] : other.terms) {
-            result[exp] -= coeff;
+        int max_degree = std::max(degree_, other.degree_);
+        Polynomial<T> result;
+        result.degree_ = max_degree;
+        result.terms = new T[max_degree + 1]{0};
+
+        for (int i = 0; i <= max_degree; ++i) {
+            result.terms[i] = (*this)[i] - other[i];
         }
-        result.normalize();
         return result;
     }
 
     // Multiplication by another polynomial
     Polynomial operator*(const Polynomial& other) const {
-        Polynomial result;
-        for (const auto& [exp1, coeff1] : terms) {
-            for (const auto& [exp2, coeff2] : other.terms) {
-                result[exp1 + exp2] += coeff1 * coeff2;
+        int new_degree = degree_ + other.degree_;
+        Polynomial<T> result;
+        result.degree_ = new_degree;
+        result.terms = new T[new_degree + 1]{0};
+
+        for (int i = 0; i <= degree_; ++i) {
+            for (int j = 0; j <= other.degree_; ++j) {
+                result.terms[i + j] += terms[i] * other.terms[j];
             }
         }
-        result.normalize();
         return result;
     }
 
     // Scalar multiplication
-    Polynomial operator*(double scalar) const {
-        Polynomial result;
-        for (const auto& [exp, coeff] : terms) {
-            result[exp] = coeff * scalar;
+    Polynomial operator*(T scalar) const {
+        Polynomial<T> result;
+        result.degree_ = degree_;
+        result.terms = new T[degree_ + 1];
+
+        for (int i = 0; i <= degree_; ++i) {
+            result.terms[i] = terms[i] * scalar;
         }
-        result.normalize();
         return result;
     }
 
     // Comparison operators
     bool operator==(const Polynomial& other) const {
-        return terms == other.terms;
+        if (degree_ != other.degree_) return false;
+        for (int i = 0; i <= degree_; ++i) {
+            if (terms[i] != other.terms[i]) return false;
+        }
+        return true;
     }
 
     bool operator!=(const Polynomial& other) const {
@@ -160,12 +190,12 @@ public:
     // Output stream (printing)
     friend std::ostream& operator<<(std::ostream& os, const Polynomial& poly) {
         bool first = true;
-        for (auto it = poly.terms.rbegin(); it != poly.terms.rend(); ++it) {
-            if (!first && it->second > 0) os << " + ";
-            if (it->second < 0) os << " - ";
-            if (std::abs(it->second) != 1 || it->first == 0) os << std::abs(it->second);
-            if (it->first != 0) os << "x";
-            if (it->first > 1) os << "^" << it->first;
+        for (int i = poly.degree_; i >= 0; --i) {
+            if (!first && poly.terms[i] >= 0) os << " + ";
+            if (poly.terms[i] < 0) os << " - ";
+            if (std::abs(poly.terms[i]) != 1 || i == 0) os << std::abs(poly.terms[i]);
+            if (i != 0) os << "x";
+            if (i > 1) os << "^" << i;
             first = false;
         }
         return os;
@@ -177,7 +207,7 @@ public:
         std::getline(is, input);
         std::istringstream ss(input);
 
-        double coeff;
+        T coeff;
         int exp;
         char x, caret;
         while (ss >> coeff) {
@@ -193,11 +223,11 @@ public:
 
 // Example usage:
 int main() {
-    Polynomial p1 = {3, 0, -4}; // 3 - 4x^2
-    Polynomial p2 = {1, 2};     // 1 + 2x
+    Polynomial<int> p1 = {3, 0, -4}; // 3 - 4x^2
+    Polynomial<int> p2 = {1, 2};     // 1 + 2x
 
-    Polynomial p3 = p1 + p2;    // Polynomial addition
-    Polynomial p4 = p1 * p2;    // Polynomial multiplication
+    Polynomial<int> p3 = p1 + p2;    // Polynomial addition
+    Polynomial<int> p4 = p1 * p2;    // Polynomial multiplication
 
     std::cout << "p1: " << p1 << "\n";
     std::cout << "p2: " << p2 << "\n";
