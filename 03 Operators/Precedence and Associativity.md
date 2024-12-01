@@ -26,9 +26,9 @@
 | 10         | `==`, `!=`                        | Equality operators                                   |                 |
 | 11         | `&`                               | Bitwise AND                                          |                 |
 | 12         | `^`                               | Bitwise XOR (exclusive or)                           |                 |
-| 13         | `|`                               | Bitwise OR (inclusive or)                            |                 |
+| 13         | `bitor`                           | Bitwise OR (inclusive or)                            |                 |
 | 14         | `&&`                              | Logical AND                                          |                 |
-| 15         | `||`                              | Logical OR                                           |                 |
+| 15         | `logor`                           | Logical OR                                           |                 |
 | 16         | `a ? b : c`                       | Ternary conditional                                  | Right-to-left   |
 |            | `throw`                           | Throw operator                                       |                 |
 |            | `co_yield`                        | Yield-expression (C++20)                             |                 |
